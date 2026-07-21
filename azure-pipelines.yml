@@ -18,9 +18,37 @@ variables:
   resourceGroup: 'rg-personal-website'
   containerAppName: 'personal-website'
 
+  # Replace this with the actual Application URL from Azure.
+  containerAppUrl: 'https://YOUR-APP-URL.azurecontainerapps.io'
+
 stages:
+  - stage: Validate
+    displayName: Validate Website Files
+
+    jobs:
+      - job: ValidateFiles
+        displayName: Validate Deployment Files
+
+        steps:
+          - checkout: self
+
+          - script: |
+              set -e
+
+              test -f Dockerfile
+              test -f index.html
+              test -f umer-intro.mp4
+
+              grep -q "FROM nginx" Dockerfile
+              grep -qi "<html" index.html
+
+              echo "Required website files are valid."
+            displayName: Validate Required Files
+
   - stage: Build
     displayName: Build and Push Docker Image
+    dependsOn: Validate
+    condition: succeeded()
 
     jobs:
       - job: BuildImage
@@ -36,7 +64,12 @@ stages:
               containerRegistry: '$(dockerServiceConnection)'
 
           - script: |
-              docker buildx create --use --name website-builder
+              set -e
+
+              docker buildx create \
+                --use \
+                --name website-builder
+
               docker buildx inspect --bootstrap
 
               docker buildx build \
@@ -65,3 +98,40 @@ stages:
               containerAppName: '$(containerAppName)'
               resourceGroup: '$(resourceGroup)'
               imageToDeploy: '$(imageRepository):$(imageTag)'
+
+  - stage: SmokeTest
+    displayName: Test Deployed Website
+    dependsOn: Deploy
+    condition: succeeded()
+
+    jobs:
+      - job: VerifyWebsite
+        displayName: Verify Website Response
+
+        steps:
+          - script: |
+              set -e
+
+              echo "Waiting for Azure Container Apps to activate the revision..."
+              sleep 20
+
+              HTTP_STATUS=$(curl \
+                --silent \
+                --output response.html \
+                --write-out "%{http_code}" \
+                --retry 6 \
+                --retry-delay 10 \
+                "$(containerAppUrl)")
+
+              echo "HTTP status: $HTTP_STATUS"
+
+              if [ "$HTTP_STATUS" != "200" ]; then
+                echo "Website test failed."
+                cat response.html
+                exit 1
+              fi
+
+              grep -qi "<html" response.html
+
+              echo "Deployment and smoke test succeeded."
+            displayName: Test Live Website
