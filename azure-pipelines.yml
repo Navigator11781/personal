@@ -19,8 +19,7 @@ variables:
   containerAppName: 'personal-website'
 
   # Replace this with the actual Application URL from Azure.
-  containerAppUrl: 'https://YOUR-APP-URL.azurecontainerapps.io'
-
+  containerAppUrl: 'https://personal-website.agreeablebush-ba55f445.westus2.azurecontainerapps.io'
 stages:
   - stage: Validate
     displayName: Validate Website Files
