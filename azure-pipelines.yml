@@ -45,7 +45,7 @@ stages:
             displayName: Validate Required Files
 
   - stage: Build
-    displayName: Build and Push Docker Image
+    displayName: Building Docker Image
     dependsOn: Validate
     condition: succeeded()
 
